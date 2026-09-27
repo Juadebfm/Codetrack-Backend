@@ -1,57 +1,58 @@
 import mongoose from "mongoose";
 
-const userSchema = new mongoose.Schema({
-    displayName: { 
-        type: String, 
-        required: true, 
-        trim: true, 
-        minlength: 2, 
-        maxLength: 80, 
+const userSchema = new mongoose.Schema(
+  {
+    displayName: {
+      type: String,
+      required: true,
+      trim: true,
+      minLength: 2,
+      maxLength: 80,
     },
     email: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true,
+      type: String,
+      required: true,
+      unique: true,
+      lowercase: true,
+      trim: true,
     },
-    password: {
-        type: String
-        required: true,
-        select: false,
+    passwordHash: {
+      type: String,
+      required: true,
+      select: false,
     },
-    emailVerificationAt: {
-        type: String,
-        default: null,
+    emailVerifiedAt: {
+      type: Date,
+      default: null,
     },
-    emailVerificationToken: {
-        type: String,
-        default: null,
+    emailVerificationTokenHash: {
+      type: String,
+      select: false,
     },
-    emailVerificationExpires: {
-        type: String,
-        default: null,
+    emailVerificationExpiresAt: {
+      type: Date,
+      select: false,
     },
-    passwordResetTokenHash:{
-        type: String,
-        select: false,
+    passwordResetTokenHash: {
+      type: String,
+      select: false,
     },
-     passwordResetExpiresAt:{
-        type: Daate,
-        select: false,
+    passwordResetExpiresAt: {
+      type: Date,
+      select: false,
     },
     sessionVersion: {
-        type: Number,
-        default: 0,
-        select: false,
+      type: Number,
+      default: 0,
+      select: false,
     },
     plan: {
-        type: String,
-        enum: ["Free"],
-        default: "free"
+      type: String,
+      enum: ["Free"],
+      default: "free",
     },
-}
-{ timeStamp: true },
-) 
+  },
+  { timestamps: true },
+);
 
-export 
+export const User = mongoose.model("User", userSchema);

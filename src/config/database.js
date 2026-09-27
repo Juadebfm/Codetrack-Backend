@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
-import { environment } from "./environment.js"
+import { environment } from "./environment.js";
 
-export async function connectToDatabase() {
-    await mongoose .connect(environment.mongodbUri, {
-    console.log('Successfully Connected to MongoDB at port $(environment)');
+export async function connectDatabase() {
+  await mongoose.connect(environment.mongoUri);
+  console.log(`Successfully Connected to MongoDB at port ${environment.port}`);
 }
