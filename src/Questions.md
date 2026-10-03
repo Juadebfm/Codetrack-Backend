@@ -18,3 +18,5 @@ CORS configuration
 Helmet
      ↓
 Database security
+
+If API is a way for different applications or parts of an application to communicate with each other. Can we consider CORS an API tool or agent?
