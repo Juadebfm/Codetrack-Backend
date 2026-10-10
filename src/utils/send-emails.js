@@ -1,5 +1,5 @@
 import { MailtrapClient } from "mailtrap";
-import { environment } from "../config/environment";
+import { environment } from "../config/environment.js";
 
 // This utility has one job: send an already prepared wmail through MailTrap
 export async function sendEmail(to, subject, linkText, link) {

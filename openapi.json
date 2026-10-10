@@ -1,0 +1,599 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "CodeTrack Backend API",
+    "version": "1.0.0",
+    "description": "OpenAPI specification for the current CodeTrack backend. Authentication endpoints are grouped under the single Auth tag for Postman. Session tokens are issued as HTTP-only cookies; login and refresh responses set them automatically."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4000",
+      "description": "Local server (default port from the application configuration)"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth",
+      "description": "Registration, email verification, session, and password management"
+    },
+    {
+      "name": "Health",
+      "description": "Service health check"
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Check API health",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "The API is responding",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": { "status": "ok" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Register an account",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RegisterRequest" },
+              "example": {
+                "displayName": "Ada Lovelace",
+                "email": "ada@example.com",
+                "password": "correct-horse-123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Account created; a verification email was sent",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/RegisterResponse" },
+                "example": {
+                  "message": "Account created successfully, Check your email to verify it",
+                  "user": {
+                    "id": "665f1a2b3c4d5e6f78901234",
+                    "displayName": "Ada Lovelace",
+                    "email": "ada@example.com",
+                    "emailVerifiedAt": null,
+                    "plan": "Free"
+                  }
+                }
+              }
+            }
+          },
+          "400": { "$ref": "#/components/responses/InvalidRegistration" },
+          "409": {
+            "description": "An account already exists for this email",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": {
+                  "error": {
+                    "message": "An account with that email already exists, Please go to login if you are the account owner"
+                  }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/verify-email": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Verify an email address",
+        "operationId": "verifyEmail",
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "64-character hexadecimal token from the verification email",
+            "schema": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-fA-F0-9]{64}$" },
+            "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Email verified",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" },
+                "example": { "message": "Email verified. You can login now" }
+              }
+            }
+          },
+          "400": {
+            "description": "Token is missing, malformed, invalid, or expired",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "missingOrMalformed": {
+                    "value": { "error": { "message": "Verifying email failed, A valid token is required" } }
+                  },
+                  "invalidOrExpired": {
+                    "value": { "error": { "message": "That verification link is invalid or has expired" } }
+                  }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/resend-verification": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Resend the verification email",
+        "operationId": "resendVerification",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmailRequest" },
+              "example": { "email": "ada@example.com" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generic response to avoid revealing whether an account exists or is verified",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" },
+                "example": { "message": "If an unverified account exists, a verification email has been sent" }
+              }
+            }
+          },
+          "400": {
+            "description": "Email is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": { "message": "Provide a valid email address" } }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log in and establish a session",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LoginRequest" },
+              "example": { "email": "ada@example.com", "password": "correct-horse-123" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login succeeded. Sets the codetrack_access and codetrack_refresh HTTP-only cookies.",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Session cookies; both are HTTP-only, same-site lax, and scoped to /api/v1/auth. The access JWT expires in 15 minutes (cookie max-age 30 minutes); the refresh JWT expires in 7 days.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/AuthenticatedUserResponse" },
+                "example": {
+                  "message": "Logged In successfully",
+                  "user": {
+                    "id": "665f1a2b3c4d5e6f78901234",
+                    "displayName": "Ada Lovelace",
+                    "email": "ada@example.com",
+                    "emailVerifiedAt": "2026-10-10T12:00:00.000Z",
+                    "plan": "Free"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email or password is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": { "message": "Provide a valid email and/or password" } }
+              }
+            }
+          },
+          "401": {
+            "description": "Credentials are incorrect or email is unverified",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "invalidCredentials": { "value": { "error": { "message": "Email or password is incorrect" } } },
+                  "emailNotVerified": { "value": { "error": { "message": "Verify your email before you can log in" } } }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Refresh the session cookies",
+        "operationId": "refreshSession",
+        "description": "Reads the codetrack_refresh cookie and, if valid, issues new access and refresh cookies. No JSON request body is required.",
+        "security": [{ "RefreshCookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Session refreshed; sets new session cookies",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Updated codetrack_access and codetrack_refresh HTTP-only cookies.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" },
+                "example": { "message": "Session refreshed" }
+              }
+            }
+          },
+          "401": {
+            "description": "Refresh cookie is missing, invalid, expired, or no longer matches the user session",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Clears both session cookies when the refresh attempt is rejected.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "missingCookie": { "value": { "error": { "message": "Log in to refresh your session" } } },
+                  "invalidOrExpired": { "value": { "error": { "message": "Your session has ended. Please log in again" } } }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Log out",
+        "operationId": "logout",
+        "description": "Clears the access and refresh cookies. The route does not require a valid session.",
+        "responses": {
+          "200": {
+            "description": "Session cookies cleared",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Expires the codetrack_access and codetrack_refresh cookies.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" },
+                "example": { "message": "Logged out successfully" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Request a password-reset email",
+        "operationId": "forgotPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/EmailRequest" },
+              "example": { "email": "ada@example.com" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Generic response whether or not an account exists",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" },
+                "example": { "message": "If an account exists for that email, a password-reset link has been sent" }
+              }
+            }
+          },
+          "400": {
+            "description": "Email is missing or invalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "example": { "error": { "message": "Provide a valid email address" } }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": ["Auth"],
+        "summary": "Reset a password",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/ResetPasswordRequest" },
+              "example": {
+                "token": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+                "password": "new-correct-horse-123"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password changed; existing session cookies are cleared",
+            "headers": {
+              "Set-Cookie": {
+                "description": "Expires the codetrack_access and codetrack_refresh cookies.",
+                "schema": { "type": "string" }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/MessageResponse" },
+                "example": { "message": "Password reset successfully. Please log in with your new password" }
+              }
+            }
+          },
+          "400": {
+            "description": "Token or password is invalid, or the reset token is expired",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "invalidTokenFormat": { "value": { "error": { "message": "A valid password-reset token is required" } } },
+                  "invalidPassword": { "value": { "error": { "message": "Password must be between 8 and 128 characters" } } },
+                  "invalidOrExpiredToken": { "value": { "error": { "message": "That password-reset link is invalid or has expired" } } }
+                }
+              }
+            }
+          },
+          "429": { "$ref": "#/components/responses/RateLimited" },
+          "500": { "$ref": "#/components/responses/ServerError" }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": ["Auth"],
+        "summary": "Get the current user's profile",
+        "operationId": "getCurrentUser",
+        "security": [{ "AccessCookieAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "Authenticated user's public profile",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/CurrentUserResponse" },
+                "example": {
+                  "user": {
+                    "id": "665f1a2b3c4d5e6f78901234",
+                    "displayName": "Ada Lovelace",
+                    "email": "ada@example.com",
+                    "emailVerifiedAt": "2026-10-10T12:00:00.000Z",
+                    "plan": "Free"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Access cookie is missing or the session is invalid",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+                "examples": {
+                  "missingCookie": { "value": { "error": { "message": "Log in to use this route" } } },
+                  "invalidOrExpired": { "value": { "error": { "message": "Your session has ended. Please login again" } } },
+                  "revokedSession": { "value": { "error": { "message": "Your session has ended. Please log in again" } } }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "AccessCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "codetrack_access",
+        "description": "HTTP-only access-token cookie set by login or refresh."
+      },
+      "RefreshCookieAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "codetrack_refresh",
+        "description": "HTTP-only refresh-token cookie set by login or refresh."
+      }
+    },
+    "responses": {
+      "InvalidRegistration": {
+        "description": "Display name, email, or password does not meet validation requirements",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "error": {
+                "message": "Provide a name, valid email, and password with at least 8 characters"
+              }
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "More than 10 requests were made to this rate-limited auth route within 15 minutes",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "error": {
+                "message": "Too many requests. Please wait 15 minutes and try again"
+              }
+            }
+          }
+        }
+      },
+      "ServerError": {
+        "description": "Unexpected server, database, or email-provider error. In production the message is generic; outside production it contains the underlying error message.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "error": { "message": "Something went wrong. Please try again later" }
+            }
+          }
+        }
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "required": ["status"],
+        "properties": {
+          "status": { "type": "string", "const": "ok" }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["displayName", "email", "password"],
+        "properties": {
+          "displayName": { "type": "string", "minLength": 2, "maxLength": 80, "description": "Leading and trailing whitespace is trimmed before saving." },
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string", "minLength": 8, "maxLength": 128 }
+        }
+      },
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": { "type": "string", "format": "email" },
+          "password": { "type": "string" }
+        }
+      },
+      "EmailRequest": {
+        "type": "object",
+        "required": ["email"],
+        "properties": {
+          "email": { "type": "string", "format": "email" }
+        }
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "required": ["token", "password"],
+        "properties": {
+          "token": { "type": "string", "minLength": 64, "maxLength": 64, "pattern": "^[a-fA-F0-9]{64}$", "description": "64-character hexadecimal token from the password-reset email." },
+          "password": { "type": "string", "minLength": 8, "maxLength": 128 }
+        }
+      },
+      "PublicUser": {
+        "type": "object",
+        "required": ["id", "displayName", "email", "emailVerifiedAt", "plan"],
+        "properties": {
+          "id": { "type": "string", "description": "MongoDB user ID." },
+          "displayName": { "type": "string" },
+          "email": { "type": "string", "format": "email" },
+          "emailVerifiedAt": { "type": ["string", "null"], "format": "date-time" },
+          "plan": { "type": "string", "const": "Free" }
+        }
+      },
+      "MessageResponse": {
+        "type": "object",
+        "required": ["message"],
+        "properties": {
+          "message": { "type": "string" }
+        }
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "required": ["message", "user"],
+        "properties": {
+          "message": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/PublicUser" }
+        }
+      },
+      "AuthenticatedUserResponse": {
+        "type": "object",
+        "required": ["message", "user"],
+        "properties": {
+          "message": { "type": "string" },
+          "user": { "$ref": "#/components/schemas/PublicUser" }
+        }
+      },
+      "CurrentUserResponse": {
+        "type": "object",
+        "required": ["user"],
+        "properties": {
+          "user": { "$ref": "#/components/schemas/PublicUser" }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "required": ["error"],
+        "properties": {
+          "error": {
+            "type": "object",
+            "required": ["message"],
+            "properties": {
+              "message": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

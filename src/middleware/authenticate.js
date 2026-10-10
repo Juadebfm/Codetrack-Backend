@@ -2,7 +2,7 @@ import { User } from "../models/user.model.js";
 import { sessionCookies, verifyAccessToken } from "../utils/session-token.js";
 
 export async function authenticate(request, response, next) {
-  const accessToken = request.cookies(sessionCookies.accessCookieName);
+  const accessToken = request.cookies?.[sessionCookies.accessCookieName];
 
   if (!accessToken) {
     return response

@@ -1,6 +1,6 @@
 import jwt from "jsonwebtoken";
 
-import { environment } from "../config/environment";
+import { environment } from "../config/environment.js";
 
 const accessCookieName = "codetrack_access";
 const refreshCookieName = "codetrack_refresh";
@@ -25,6 +25,7 @@ export function createSessionTokens(user) {
 export function verifyAccessToken(token) {
   return jwt.verify(token, environment.accessSecret);
 }
+
 export function verifyRefreshToken(token) {
   return jwt.verify(token, environment.refreshSecret);
 }
@@ -40,7 +41,7 @@ function cookieOptions(maxAge) {
 }
 
 // add values to the cookie table
-function setSessionCookies(response, tokens) {
+export function setSessionCookies(response, tokens) {
   response.cookie(
     accessCookieName,
     tokens.accessToken,
@@ -56,9 +57,9 @@ function setSessionCookies(response, tokens) {
 }
 
 // Clear value from cookie table
-function clearSessionCookies(response) {
+export function clearSessionCookies(response) {
   response.clearCookie(accessCookieName, cookieOptions(0));
-  response.cookie(refreshCookieName, cookieOptions(0));
+  response.clearCookie(refreshCookieName, cookieOptions(0));
 }
 
 export const sessionCookies = { accessCookieName, refreshCookieName };
