@@ -7,7 +7,10 @@ export const environment = {
   frontendUrl: process.env.FRONTEND_URL || "http://localhost:5173",
   accessSecret: process.env.JWT_ACCESS_SECRET,
   refreshSecret: process.env.JWT_REFRESH_SECRET,
-  mailtrapToken: process.env.MAILTRAP_TOKEN,
+  smtpHost: process.env.SMTP_HOST,
+  smtpPort: Number(process.env.SMTP_PORT || 587),
+  smtpUser: process.env.SMTP_USER,
+  smtpPass: process.env.SMTP_PASS,
   mailFromEmail: process.env.MAIL_FROM_EMAIL,
   mailFromName: process.env.MAIL_FROM_NAME,
 };
@@ -36,8 +39,13 @@ export function assertRuntimeConfiguration() {
 
   const missingNames = requiredNames.filter((name) => !process.env[name]?.trim());
 
-  if (environment.nodeEnv !== "test" && !environment.mailtrapToken) {
-    missingNames.push("MAILTRAP_TOKEN");
+  if (environment.nodeEnv !== "test") {
+    for (const name of ["SMTP_HOST", "SMTP_USER", "SMTP_PASS"]) {
+      if (!process.env[name]?.trim()) missingNames.push(name);
+    }
+    if (!Number.isInteger(environment.smtpPort) || environment.smtpPort < 1 || environment.smtpPort > 65535) {
+      throw new Error("SMTP_PORT must be an integer between 1 and 65535");
+    }
   }
 
   if (environment.nodeEnv !== "test" && !environment.mailFromEmail?.trim()) {

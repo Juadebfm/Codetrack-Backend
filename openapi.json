@@ -4,7 +4,7 @@
   "info": {
     "title": "CodeTrack API",
     "version": "1.0.0",
-    "description": "CodeTrack API with mounted account, session, learning-log, goal, dashboard, health and readiness routes. Protected resources belong to the signed-in user. Browser clients must include credentials. Email delivery uses Mailtrap; failed deliveries can be retried through resend-verification or forgot-password."
+    "description": "CodeTrack API with mounted account, session, learning-log, goal, dashboard, health and readiness routes. Protected resources belong to the signed-in user. Browser clients must include credentials. Email delivery uses Nodemailer with configured SMTP credentials; failed deliveries can be retried through resend-verification or forgot-password."
   },
   "servers": [
     {

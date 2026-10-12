@@ -6,7 +6,7 @@ Express and MongoDB API for accounts, learning logs, goals, and a learning dashb
 
 1. Install Node.js 24 or later and MongoDB.
 2. Run `npm install`.
-3. Copy `.env.example` to `.env`. Set the database URI, two different random JWT secrets of at least 32 bytes each, frontend origin, and Mailtrap token and sender email. Never commit secrets.
+3. Copy `.env.example` to `.env`. Set the database URI, two different random JWT secrets of at least 32 bytes each, frontend origin, and Mailtrap SMTP host, port, username, password and sender email. Never commit secrets.
 4. Run `npm run dev` (or `npm start`).
 
 The default port is 4000. On PowerShell with script execution disabled, use `npm.cmd` instead of `npm`. Generate each secret independently, for example with `node -e "console.log(require('node:crypto').randomBytes(32).toString('hex'))"`.
@@ -34,3 +34,11 @@ Auth endpoints share a limit of 10 attempts per IP per 15 minutes. The current l
 Run `npm test` and `npm run lint`. Integration tests use a disposable MongoDB instance via mongodb-memory-server and stub email delivery. The first test run may download a MongoDB binary. Tests never use the configured application database or send real email. Live Mailtrap delivery must be checked separately with your sender configuration.
 
 The server drains HTTP requests and disconnects MongoDB on SIGINT/SIGTERM, with a ten-second shutdown deadline.
+
+## SMTP email setup
+
+The email helper now uses Nodemailer. Copy SMTP_HOST, SMTP_PORT, SMTP_USER and SMTP_PASS from the SMTP tab for the Mailtrap sending domain or sandbox you intend to use. MAILTRAP_TOKEN is no longer used. SMTP_PORT defaults to 587; port 465 uses implicit TLS and other ports require STARTTLS. Keep SMTP passwords in .env, never .env.example. Restart after editing .env.
+
+A sending-domain SMTP connection delivers to real inboxes; Sandbox captures messages inside Mailtrap. For the Demo sending domain, use its displayed sender and permitted recipient. SMTP acceptance does not guarantee inbox delivery.
+
+Delivery failures log only a safe code and SMTP status, never provider response text or credentials. EAUTH indicates rejected credentials, EDNS a lookup failure, ETIMEDOUT a timeout, and EENVELOPE a rejected sender/recipient. Retry verification through POST /api/v1/auth/resend-verification after resolving configuration.

@@ -4,7 +4,7 @@ import { User } from "../models/user.model.js";
 import { Session } from "../models/session.model.js";
 import { environment } from "../config/environment.js";
 import { hashOpaqueToken, createOpaqueToken } from "../utils/token.js";
-import { emailTransport } from "../utils/send-emails.js";
+import { emailTransport, safeEmailError } from "../utils/send-emails.js";
 import { bodyOf, badRequest, validEmail, validPassword, validToken } from "../utils/validation.js";
 import { clearSessionCookies, createSessionTokens, sessionCookies, setSessionCookies,
   verifyRefreshToken, verifyAccessToken, refreshLifetimeMs } from "../utils/session-token.js";
@@ -36,9 +36,9 @@ async function sendLink(user, purpose) {
   try {
     await emailTransport.send(user.email, subject, subject, environment.frontendUrl + "/" + action + "?token=" + token);
     return true;
-  } catch {
+  } catch (error) {
     await User.updateOne({ _id: user._id }, { $pull: { [field]: { hash } } });
-    console.error("Account email delivery failed; the user can request another link");
+    console.error("Account email delivery failed; the user can request another link", safeEmailError(error));
     return false;
   }
 }

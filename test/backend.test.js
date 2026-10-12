@@ -115,7 +115,7 @@ test("startup rejects missing configuration before connecting", () => {
 
 test("runtime configuration rejects invalid ports and requires email outside tests", () => {
   const script = 'import { assertRuntimeConfiguration } from "./src/config/environment.js"; assertRuntimeConfiguration();';
-  const baseEnv = { ...process.env, NODE_ENV: "test", MONGODB_URI: "mongodb://localhost/test", JWT_ACCESS_SECRET: "test-access", JWT_REFRESH_SECRET: "test-refresh", MAILTRAP_TOKEN: "" };
+  const baseEnv = { ...process.env, NODE_ENV: "test", MONGODB_URI: "mongodb://localhost/test", JWT_ACCESS_SECRET: "test-access", JWT_REFRESH_SECRET: "test-refresh", SMTP_HOST: "", SMTP_USER: "", SMTP_PASS: "" };
   for (const port of ["abc", "0", "65536", "1.5"]) {
     const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], {
       encoding: "utf8", env: { ...baseEnv, PORT: port }, timeout: 10000,
@@ -127,5 +127,5 @@ test("runtime configuration rejects invalid ports and requires email outside tes
     encoding: "utf8", env: { ...baseEnv, NODE_ENV: "production", PORT: "4000" }, timeout: 10000,
   });
   assert.equal(result.status, 1);
-  assert.match(result.stderr, /Missing required environment variables: MAILTRAP_TOKEN/);
+  assert.match(result.stderr, /Missing required environment variables: SMTP_HOST/);
 });

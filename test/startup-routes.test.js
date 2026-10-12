@@ -37,7 +37,7 @@ test("configuration rejects invalid frontend origins and missing sender", () => 
     assert.equal(result.status, 1);
     assert.match(result.stderr, /FRONTEND_URL must/);
   }
-  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], { env: { ...env, NODE_ENV: "production", MAILTRAP_TOKEN: "test", MAIL_FROM_EMAIL: "" }, encoding: "utf8", timeout: 10000 });
+  const result = spawnSync(process.execPath, ["--input-type=module", "-e", script], { env: { ...env, NODE_ENV: "production", SMTP_HOST: "smtp.example.com", SMTP_USER: "test", SMTP_PASS: "test", MAIL_FROM_EMAIL: "" }, encoding: "utf8", timeout: 10000 });
   assert.equal(result.status, 1);
   assert.match(result.stderr, /MAIL_FROM_EMAIL/);
 });
