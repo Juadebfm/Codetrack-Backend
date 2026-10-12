@@ -1,18 +1,6 @@
 import nodemailer from "nodemailer";
 import { environment } from "../config/environment.js";
 
-const smtpPort = Number(environment.mailtrapPort || 587);
-
-const transport = nodemailer.createTransport({
-  host: environment.mailtrapHost,
-  port: smtpPort,
-  secure: smtpPort === 465,
-  auth: {
-    user: environment.mailtrapUser,
-    pass: environment.mailtrapPassword,
-  },
-});
-
 function escapeHtml(value) {
   return String(value).replace(/[&<>"']/g, (character) => {
     const entities = {
@@ -118,9 +106,19 @@ function createEmailContent(subject, linkText, link) {
 export async function sendEmail(to, subject, linkText, link) {
   if (environment.nodeEnv === "test") return;
 
+  const transport = nodemailer.createTransport({
+    host: environment.smtpHost,
+    port: environment.smtpPort,
+    secure: environment.smtpPort === 465,
+    requireTLS: environment.smtpPort !== 465,
+    auth: { user: environment.smtpUser, pass: environment.smtpPass },
+    connectionTimeout: 10000,
+    greetingTimeout: 10000,
+    socketTimeout: 15000,
+  });
   const { text, html } = createEmailContent(subject, linkText, link);
 
-  await transport.sendMail({
+  const result = await transport.sendMail({
     from: {
       name: environment.mailFromName || "CodeTrack",
       address: environment.mailFromEmail,
@@ -130,4 +128,20 @@ export async function sendEmail(to, subject, linkText, link) {
     text,
     html,
   });
+  if (!result.accepted?.length || result.rejected?.length) {
+    throw Object.assign(new Error("SMTP did not accept the recipient"), { code: "EENVELOPE" });
+  }
+  return result;
 }
+
+// Log only known codes, never provider text containing credentials or links.
+export function safeEmailError(error) {
+  const codes = new Set(["EAUTH", "ECONNECTION", "ESOCKET", "ETIMEDOUT", "EDNS", "EENVELOPE", "EMESSAGE", "ETLS"]);
+  return {
+    code: codes.has(error?.code) ? error.code : "EMAIL_DELIVERY_FAILED",
+    ...(Number.isInteger(error?.responseCode) && error.responseCode >= 400 && error.responseCode <= 599
+      ? { responseCode: error.responseCode } : {}),
+  };
+}
+
+export const emailTransport = { send: sendEmail };
