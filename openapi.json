@@ -1,0 +1,1910 @@
+{
+  "openapi": "3.0.3",
+  "x-note": "info describes the API; servers lists base URLs; tags groups endpoints; paths defines requests; components holds reusable definitions.",
+  "info": {
+    "title": "CodeTrack API",
+    "version": "1.0.0",
+    "description": "CodeTrack API with mounted account, session, learning-log, goal, dashboard, health and readiness routes. Protected resources belong to the signed-in user. Browser clients must include credentials. Email delivery uses Mailtrap; failed deliveries can be retried through resend-verification or forgot-password."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:{port}",
+      "description": "Local backend address.",
+      "variables": {
+        "port": {
+          "default": "4000",
+          "description": "Value of the PORT environment variable."
+        }
+      }
+    }
+  ],
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Server availability."
+    },
+    {
+      "name": "Authentication",
+      "description": "Account, email, password, and session operations."
+    },
+    {
+      "name": "Learning logs",
+      "description": "Study sessions owned by the signed-in user."
+    },
+    {
+      "name": "Goals",
+      "description": "Learning targets and progress."
+    },
+    {
+      "name": "Dashboard",
+      "description": "Learning totals and UTC study streaks."
+    }
+  ],
+  "paths": {
+    "/api/v1/health": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Check server availability",
+        "operationId": "getHealth",
+        "description": "Mounted endpoint returning a fixed status without checking external services.",
+        "x-implementation-status": "mounted",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Server is responding.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HealthResponse"
+                },
+                "example": {
+                  "status": "ok"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/register": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Create an account",
+        "operationId": "register",
+        "description": "Validate input, hash the password and create the account. Send a verification link valid for 24 hours. Duplicate emails return 409, including concurrent registrations. Delivery failure returns 201 with verificationEmailSent=false so the client can offer resend.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "201": {
+            "description": "Account created, even if verification delivery needs retrying.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RegisterResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Send these fields as application/json.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/verify-email": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Verify an email address",
+        "operationId": "verifyEmail",
+        "description": "Atomically consume a valid token and mark the email verified. Successful verification invalidates all outstanding verification links.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Verify an email address.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "required": true,
+            "description": "Token from the verification link.",
+            "schema": {
+              "type": "string",
+              "description": "Email-link token; the controller checks that it has 64 characters.",
+              "minLength": 64,
+              "maxLength": 64,
+              "pattern": "^[a-f0-9]{64}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/auth/resend-verification": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Resend verification email",
+        "operationId": "resendVerification",
+        "description": "Request a new verification link. Earlier unexpired links remain valid if delivery fails. The generic response does not reveal account existence or delivery status. Retry later if no message arrives.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Resend verification email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Send these fields as application/json.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/login": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign in",
+        "operationId": "login",
+        "description": "Require valid credentials and a verified email, then create a revocable browser session. Access tokens last 15 minutes; refresh tokens last 7 days.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sign in.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuthResponse"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Separate headers set or clear the access cookie at /api/v1 and refresh cookie at /api/v1/auth. The old access cookie at /api/v1/auth is also cleared.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Send these fields as application/json.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/refresh": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Refresh session cookies",
+        "operationId": "refresh",
+        "description": "Atomically rotate the stored refresh-token hash and issue new cookies. Reusing a previous refresh token revokes that browser session. Clients must serialize refresh requests. Session version and expiry are checked.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [
+          {
+            "refreshCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Refresh session cookies.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Separate headers set or clear the access cookie at /api/v1 and refresh cookie at /api/v1/auth. The old access cookie at /api/v1/auth is also cleared.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/logout": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Sign out of this browser",
+        "operationId": "logout",
+        "description": "Revoke sessions identified by valid supplied access or refresh cookies, then clear cookies. Idempotent when cookies are missing or invalid; other browser sessions remain active.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Sign out of this browser.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Separate headers set or clear the access cookie at /api/v1 and refresh cookie at /api/v1/auth. The old access cookie at /api/v1/auth is also cleared.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/auth/forgot-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Request a password-reset email",
+        "operationId": "forgotPassword",
+        "description": "Request a reset link valid for 15 minutes. Existing links survive failed delivery. The response is identical for missing accounts and mail-delivery failures; retry later if no message arrives.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Request a password-reset email.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Send these fields as application/json.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmailRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/reset-password": {
+      "post": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Reset the password",
+        "operationId": "resetPassword",
+        "description": "Atomically consume a reset token, store the new password hash, and increment sessionVersion. Invalidate every existing login session and reset link, then clear cookies.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [],
+        "responses": {
+          "200": {
+            "description": "Reset the password.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Message"
+                }
+              }
+            },
+            "headers": {
+              "Set-Cookie": {
+                "description": "Separate headers set or clear the access cookie at /api/v1 and refresh cookie at /api/v1/auth. The old access cookie at /api/v1/auth is also cleared.",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Send these fields as application/json.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/auth/me": {
+      "get": {
+        "tags": [
+          "Authentication"
+        ],
+        "summary": "Get the current user",
+        "operationId": "me",
+        "description": "Validate access-token type, user session version, email verification, and the stored browser session; return the public profile.",
+        "x-implementation-status": "mounted",
+        "x-note": "requestBody describes JSON input; parameters describes URL input; responses lists status codes; security names required cookies.",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Get the current user.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    },
+    "/api/v1/ready": {
+      "get": {
+        "tags": [
+          "Health"
+        ],
+        "summary": "Check database readiness",
+        "operationId": "getReadiness",
+        "description": "Reports the current MongoDB connection state; this is not a database ping.",
+        "security": [],
+        "x-implementation-status": "mounted",
+        "responses": {
+          "200": {
+            "description": "MongoDB is connected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "ready"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "status": "ready"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "MongoDB is not connected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "required": [
+                    "status"
+                  ],
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "enum": [
+                        "unavailable"
+                      ]
+                    }
+                  }
+                },
+                "example": {
+                  "status": "unavailable"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logs": {
+      "get": {
+        "tags": [
+          "Learning logs"
+        ],
+        "operationId": "listLearningLogs",
+        "summary": "list log",
+        "description": "Only accesses records owned by the signed-in user. Sorted newest first by loggedAt, then ID.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningLogList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number.",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records per page.",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Learning logs"
+        ],
+        "operationId": "createLearningLog",
+        "summary": "create log",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful create.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningLogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Editable JSON fields only.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateLearningLog"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/logs/{id}": {
+      "get": {
+        "tags": [
+          "Learning logs"
+        ],
+        "operationId": "getLearningLog",
+        "summary": "get log",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful get.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningLogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Owned record ID.",
+            "schema": {
+              "type": "string",
+              "description": "Record ID.",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Learning logs"
+        ],
+        "operationId": "updateLearningLog",
+        "summary": "update log",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful update.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LearningLogResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Owned record ID.",
+            "schema": {
+              "type": "string",
+              "description": "Record ID.",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Editable JSON fields only.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateLearningLog"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Learning logs"
+        ],
+        "operationId": "deleteLearningLog",
+        "summary": "delete log",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful delete."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Owned record ID.",
+            "schema": {
+              "type": "string",
+              "description": "Record ID.",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/goals": {
+      "get": {
+        "tags": [
+          "Goals"
+        ],
+        "operationId": "listGoals",
+        "summary": "list goal",
+        "description": "Only accesses records owned by the signed-in user. Sorted newest first by createdAt, then ID.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalList"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "Page number.",
+            "schema": {
+              "type": "integer",
+              "default": 1,
+              "minimum": 1,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "Maximum records per page.",
+            "schema": {
+              "type": "integer",
+              "default": 20,
+              "minimum": 1,
+              "maximum": 100
+            }
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "Goals"
+        ],
+        "operationId": "createGoal",
+        "summary": "create goal",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": "Successful create.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Editable JSON fields only.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateGoal"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/goals/{id}": {
+      "get": {
+        "tags": [
+          "Goals"
+        ],
+        "operationId": "getGoal",
+        "summary": "get goal",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful get.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Owned record ID.",
+            "schema": {
+              "type": "string",
+              "description": "Record ID.",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ]
+      },
+      "patch": {
+        "tags": [
+          "Goals"
+        ],
+        "operationId": "updateGoal",
+        "summary": "update goal",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful update.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GoalResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Owned record ID.",
+            "schema": {
+              "type": "string",
+              "description": "Record ID.",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Editable JSON fields only.",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateGoal"
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Goals"
+        ],
+        "operationId": "deleteGoal",
+        "summary": "delete goal",
+        "description": "Only accesses records owned by the signed-in user.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful delete."
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "description": "Owned record ID.",
+            "schema": {
+              "type": "string",
+              "description": "Record ID.",
+              "pattern": "^[a-fA-F0-9]{24}$"
+            }
+          }
+        ]
+      }
+    },
+    "/api/v1/dashboard": {
+      "get": {
+        "tags": [
+          "Dashboard"
+        ],
+        "operationId": "getDashboard",
+        "summary": "Get your learning summary",
+        "description": "Totals, UTC streaks and up to five recent logs. Empty accounts return zero totals and an empty list.",
+        "x-implementation-status": "mounted",
+        "security": [
+          {
+            "accessCookie": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Learning summary.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DashboardResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "500": {
+            "$ref": "#/components/responses/InternalServerError"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "x-note": "Schemas define JSON shapes; responses reuse errors; securitySchemes defines required cookies.",
+    "securitySchemes": {
+      "accessCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "codetrack_access",
+        "description": "HttpOnly access cookie, Path=/api/v1, SameSite=Lax, Secure in production. Cookie and JWT expire after 15 minutes. A non-revoked database session is required."
+      },
+      "refreshCookie": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "codetrack_refresh",
+        "description": "HttpOnly refresh cookie, Path=/api/v1/auth, SameSite=Lax, Secure in production. Expires after 7 days and rotates on refresh. Previous-token reuse revokes the session."
+      }
+    },
+    "schemas": {
+      "HealthResponse": {
+        "type": "object",
+        "description": "Server availability response; does not check the database.",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "ok"
+            ],
+            "description": "Fixed health status."
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "Error": {
+        "type": "object",
+        "description": "Shared error shape.",
+        "required": [
+          "error"
+        ],
+        "properties": {
+          "error": {
+            "type": "object",
+            "description": "Failure details.",
+            "required": [
+              "message"
+            ],
+            "properties": {
+              "message": {
+                "type": "string",
+                "description": "Human-readable error."
+              }
+            }
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "Message": {
+        "type": "object",
+        "description": "Confirmation response.",
+        "required": [
+          "message"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Human-readable confirmation."
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "User": {
+        "type": "object",
+        "description": "Public profile; secret fields are omitted.",
+        "required": [
+          "id",
+          "displayName",
+          "email",
+          "emailVerifiedAt",
+          "plan"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "MongoDB user ID.",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "displayName": {
+            "type": "string",
+            "description": "User display name."
+          },
+          "email": {
+            "type": "string",
+            "description": "Account email; stored trimmed and lowercase.",
+            "format": "email",
+            "example": "ada@example.com"
+          },
+          "emailVerifiedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Verification time, or null before verification."
+          },
+          "plan": {
+            "type": "string",
+            "enum": [
+              "Free"
+            ],
+            "description": "Current supported account plan."
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "AuthResponse": {
+        "type": "object",
+        "description": "Registration or login confirmation and public profile.",
+        "required": [
+          "message",
+          "user"
+        ],
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Confirmation message."
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "UserResponse": {
+        "type": "object",
+        "description": "Current user profile.",
+        "required": [
+          "user"
+        ],
+        "properties": {
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "description": "Account details. Name length is checked after trimming; the model enforces the 80-character maximum.",
+        "required": [
+          "displayName",
+          "email",
+          "password"
+        ],
+        "properties": {
+          "displayName": {
+            "type": "string",
+            "description": "Display name.",
+            "minLength": 2,
+            "maxLength": 80
+          },
+          "email": {
+            "type": "string",
+            "description": "Account email; stored trimmed and lowercase.",
+            "format": "email",
+            "example": "ada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "At least 8 characters and at most 72 UTF-8 bytes. Multibyte characters consume more than one byte."
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "LoginRequest": {
+        "type": "object",
+        "description": "Account email and password; the same password length rules apply to registration, login and reset.",
+        "required": [
+          "email",
+          "password"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Account email; stored trimmed and lowercase.",
+            "format": "email",
+            "example": "ada@example.com"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "At least 8 characters and at most 72 UTF-8 bytes. Multibyte characters consume more than one byte."
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "EmailRequest": {
+        "type": "object",
+        "description": "Email for verification or password recovery.",
+        "required": [
+          "email"
+        ],
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Account email; stored trimmed and lowercase.",
+            "format": "email",
+            "example": "ada@example.com"
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "ResetPasswordRequest": {
+        "type": "object",
+        "description": "Reset token and replacement password.",
+        "required": [
+          "token",
+          "password"
+        ],
+        "properties": {
+          "token": {
+            "type": "string",
+            "description": "Email-link token; the controller checks that it has 64 characters.",
+            "minLength": 64,
+            "maxLength": 64,
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "writeOnly": true,
+            "minLength": 8,
+            "maxLength": 72,
+            "description": "At least 8 characters and at most 72 UTF-8 bytes. Multibyte characters consume more than one byte."
+          }
+        },
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses another schema."
+      },
+      "RegisterResponse": {
+        "type": "object",
+        "description": "Account creation result, including email delivery status.",
+        "properties": {
+          "message": {
+            "type": "string",
+            "description": "Confirmation and any retry instructions."
+          },
+          "verificationEmailSent": {
+            "type": "boolean",
+            "description": "False means the account exists but email delivery failed; use resend-verification."
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        },
+        "required": [
+          "message",
+          "verificationEmailSent",
+          "user"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "Pagination": {
+        "type": "object",
+        "description": "Page position and result counts.",
+        "properties": {
+          "page": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          },
+          "total": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPages": {
+            "type": "integer",
+            "minimum": 0
+          }
+        },
+        "required": [
+          "page",
+          "limit",
+          "total",
+          "totalPages"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "LearningLog": {
+        "type": "object",
+        "description": "Saved log; ownership is never supplied by the client.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Record ID.",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "title": {
+            "type": "string",
+            "description": "Study title.",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "tag": {
+            "type": "string",
+            "description": "Topic; trimmed and lowercased.",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Study duration in minutes."
+          },
+          "loggedAt": {
+            "type": "string",
+            "description": "Study time, no later than now. Defaults to now when omitted on creation.",
+            "format": "date-time"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO timestamp.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "tag",
+          "durationMinutes",
+          "loggedAt",
+          "createdAt",
+          "updatedAt"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "CreateLearningLog": {
+        "type": "object",
+        "description": "Fields for a new log.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Study title.",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "tag": {
+            "type": "string",
+            "description": "Topic; trimmed and lowercased.",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Study duration in minutes."
+          },
+          "loggedAt": {
+            "type": "string",
+            "description": "Study time, no later than now. Defaults to now when omitted on creation.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "title",
+          "tag",
+          "durationMinutes"
+        ],
+        "additionalProperties": false,
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "UpdateLearningLog": {
+        "type": "object",
+        "description": "At least one editable field.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Study title.",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "tag": {
+            "type": "string",
+            "description": "Topic; trimmed and lowercased.",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "durationMinutes": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 1440,
+            "description": "Study duration in minutes."
+          },
+          "loggedAt": {
+            "type": "string",
+            "description": "Study time, no later than now. Defaults to now when omitted on creation.",
+            "format": "date-time"
+          }
+        },
+        "minProperties": 1,
+        "additionalProperties": false,
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "LearningLogResponse": {
+        "type": "object",
+        "description": "One log.",
+        "properties": {
+          "log": {
+            "$ref": "#/components/schemas/LearningLog"
+          }
+        },
+        "required": [
+          "log"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "LearningLogList": {
+        "type": "object",
+        "description": "Paginated logs.",
+        "properties": {
+          "logs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/LearningLog"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "logs",
+          "pagination"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "Goal": {
+        "type": "object",
+        "description": "Saved goal; ownership is never supplied by the client.",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Record ID.",
+            "pattern": "^[a-fA-F0-9]{24}$"
+          },
+          "title": {
+            "type": "string",
+            "description": "Goal title.",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "currentValue": {
+            "type": "number",
+            "minimum": 0,
+            "default": 0,
+            "description": "Current progress; may exceed the target."
+          },
+          "targetValue": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Completion target."
+          },
+          "unit": {
+            "type": "string",
+            "description": "Measurement unit.",
+            "minLength": 1,
+            "maxLength": 30
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp.",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "description": "ISO timestamp.",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "currentValue",
+          "targetValue",
+          "unit",
+          "createdAt",
+          "updatedAt"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "CreateGoal": {
+        "type": "object",
+        "description": "Fields for a new goal.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Goal title.",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "currentValue": {
+            "type": "number",
+            "minimum": 0,
+            "default": 0,
+            "description": "Current progress; may exceed the target."
+          },
+          "targetValue": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Completion target."
+          },
+          "unit": {
+            "type": "string",
+            "description": "Measurement unit.",
+            "minLength": 1,
+            "maxLength": 30
+          }
+        },
+        "required": [
+          "title",
+          "targetValue",
+          "unit"
+        ],
+        "additionalProperties": false,
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "UpdateGoal": {
+        "type": "object",
+        "description": "At least one editable field.",
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Goal title.",
+            "minLength": 1,
+            "maxLength": 120
+          },
+          "currentValue": {
+            "type": "number",
+            "minimum": 0,
+            "default": 0,
+            "description": "Current progress; may exceed the target."
+          },
+          "targetValue": {
+            "type": "number",
+            "minimum": 1,
+            "description": "Completion target."
+          },
+          "unit": {
+            "type": "string",
+            "description": "Measurement unit.",
+            "minLength": 1,
+            "maxLength": 30
+          }
+        },
+        "minProperties": 1,
+        "additionalProperties": false,
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "GoalResponse": {
+        "type": "object",
+        "description": "One goal.",
+        "properties": {
+          "goal": {
+            "$ref": "#/components/schemas/Goal"
+          }
+        },
+        "required": [
+          "goal"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "GoalList": {
+        "type": "object",
+        "description": "Paginated goals.",
+        "properties": {
+          "goals": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Goal"
+            }
+          },
+          "pagination": {
+            "$ref": "#/components/schemas/Pagination"
+          }
+        },
+        "required": [
+          "goals",
+          "pagination"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      },
+      "DashboardResponse": {
+        "type": "object",
+        "description": "Statistics for the signed-in user.",
+        "properties": {
+          "totalMinutes": {
+            "type": "number",
+            "minimum": 0
+          },
+          "totalLogs": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "currentStreakDays": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Consecutive UTC study days ending today or yesterday; otherwise zero."
+          },
+          "longestStreakDays": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalGoals": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "completedGoals": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Goals with currentValue at least targetValue."
+          },
+          "recentLogs": {
+            "type": "array",
+            "maxItems": 5,
+            "items": {
+              "$ref": "#/components/schemas/LearningLog"
+            }
+          }
+        },
+        "required": [
+          "totalMinutes",
+          "totalLogs",
+          "currentStreakDays",
+          "longestStreakDays",
+          "totalGoals",
+          "completedGoals",
+          "recentLogs"
+        ],
+        "x-note": "properties explains fields; required lists mandatory fields; $ref reuses a schema."
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Missing or invalid JSON input, invalid record ID, model validation error, or invalid/expired email token.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Credentials or session are invalid, or the account email is unverified.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Registration found an existing account with this email.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Shared limit of 10 requests per IP in 15 minutes across routes using authRateLimit.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "message": "Too many requests. Please wait 15 minutes and try again"
+              }
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Unexpected server or database failure; production hides internal details.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            },
+            "example": {
+              "error": {
+                "message": "Something went wrong. Please try again later"
+              }
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Route or owned record not found. Records owned by another user also return 404.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "JSON body exceeds the 100kb limit.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,64 +1,42 @@
 import jwt from "jsonwebtoken";
-
-import { environment } from "../config/environment";
+import { randomUUID } from "node:crypto";
+import { environment } from "../config/environment.js";
 
 const accessCookieName = "codetrack_access";
 const refreshCookieName = "codetrack_refresh";
+export const refreshLifetimeMs = 7 * 24 * 60 * 60 * 1000;
 
-// Token creation function for both access and refresh token- Authentication - when a user is registered or signed-in
-function signToken(user, secret, type, expiresIn) {
-  return jwt.sign(
-    { sub: user.id, type, sessionVersion: user.sessionVersion },
-    secret,
-    { expiresIn },
-  );
-}
-
-export function createSessionTokens(user) {
+export function createSessionTokens(user, sessionId) {
+  const payload = { sub: user.id, sid: String(sessionId), sessionVersion: user.sessionVersion };
   return {
-    accessToken: signToken(user, environment.accessSecret, "access", "15m"),
-    refreshToken: signToken(user, environment.refreshSecret, "refresh", "7d"),
+    accessToken: jwt.sign({ ...payload, type: "access" }, environment.accessSecret, { algorithm: "HS256", expiresIn: "15m", jwtid: randomUUID() }),
+    refreshToken: jwt.sign({ ...payload, type: "refresh" }, environment.refreshSecret, { algorithm: "HS256", expiresIn: "7d", jwtid: randomUUID() }),
   };
 }
 
-// Verifies the tokens created (when they come from the client/request)
-export function verifyAccessToken(token) {
-  return jwt.verify(token, environment.accessSecret);
+function verify(token, secret, type) {
+  const data = jwt.verify(token, secret, { algorithms: ["HS256"] });
+  if (data.type !== type || !/^[a-f0-9]{24}$/i.test(data.sub ?? "") ||
+      !/^[a-f0-9]{24}$/i.test(data.sid ?? "") || !Number.isInteger(data.sessionVersion)) {
+    throw new Error("Invalid session token");
+  }
+  return data;
 }
-export function verifyRefreshToken(token) {
-  return jwt.verify(token, environment.refreshSecret);
+export const verifyAccessToken = token => verify(token, environment.accessSecret, "access");
+export const verifyRefreshToken = token => verify(token, environment.refreshSecret, "refresh");
+
+function cookieOptions(path) {
+  return { httpOnly: true, secure: environment.nodeEnv === "production", sameSite: "lax", path };
 }
-
-function cookieOptions(maxAge) {
-  return {
-    httpOnly: true,
-    secure: environment.nodeEnv === "production",
-    sameSite: "lax",
-    path: "/api/v1/auth",
-    maxAge,
-  };
+export function setSessionCookies(response, tokens) {
+  // Remove the old, narrower access cookie before setting the replacement.
+  response.clearCookie(accessCookieName, cookieOptions("/api/v1/auth"));
+  response.cookie(accessCookieName, tokens.accessToken, { ...cookieOptions("/api/v1"), maxAge: 15 * 60 * 1000 });
+  response.cookie(refreshCookieName, tokens.refreshToken, { ...cookieOptions("/api/v1/auth"), maxAge: refreshLifetimeMs });
 }
-
-// add values to the cookie table
-function setSessionCookies(response, tokens) {
-  response.cookie(
-    accessCookieName,
-    tokens.accessToken,
-    cookieOptions(30 * 60 * 1000), // 30 minutes
-  );
-  // accesstoken = auth token = bearer token = token
-
-  response.cookie(
-    refreshCookieName,
-    tokens.refreshToken,
-    cookieOptions(7 * 24 * 60 * 60 * 1000), // 7days
-  );
+export function clearSessionCookies(response) {
+  response.clearCookie(accessCookieName, cookieOptions("/api/v1"));
+  response.clearCookie(accessCookieName, cookieOptions("/api/v1/auth"));
+  response.clearCookie(refreshCookieName, cookieOptions("/api/v1/auth"));
 }
-
-// Clear value from cookie table
-function clearSessionCookies(response) {
-  response.clearCookie(accessCookieName, cookieOptions(0));
-  response.cookie(refreshCookieName, cookieOptions(0));
-}
-
 export const sessionCookies = { accessCookieName, refreshCookieName };

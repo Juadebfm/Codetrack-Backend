@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema(
       unique: true,
       lowercase: true,
       trim: true,
+      match: [/^[^\s@]+@[^\s@]+\.[^\s@]+$/, "Provide a valid email address"],
     },
     passwordHash: {
       type: String,
@@ -46,10 +47,13 @@ const userSchema = new mongoose.Schema(
       default: 0,
       select: false,
     },
+    // Retain earlier links during resend; consume all links after a successful use.
+    verificationTokens: { type: [{ hash: String, expiresAt: Date }], select: false, default: [] },
+    resetTokens: { type: [{ hash: String, expiresAt: Date }], select: false, default: [] },
     plan: {
       type: String,
-      enum: ["free"],
-      default: "free",
+      enum: ["Free"],
+      default: "Free",
     },
   },
   { timestamps: true },

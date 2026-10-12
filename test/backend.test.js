@@ -50,10 +50,10 @@ test("production errors hide server details but preserve client statuses", (t) =
 });
 
 test("users accept the default plan and validate email and dates", async () => {
-  const user = new User({ displayName: "Ada", email: " ADA@EXAMPLE.COM ", password: "test password" });
+  const user = new User({ displayName: "Ada", email: " ADA@EXAMPLE.COM ", passwordHash: await bcrypt.hash("test password", 4) });
   await user.validate();
   assert.equal(user.email, "ada@example.com");
-  assert.equal(user.plan, "free");
+  assert.equal(user.plan, "Free");
   user.email = "invalid";
   await assert.rejects(user.validate(), /valid email/);
   user.email = "ada@example.com";
@@ -61,28 +61,28 @@ test("users accept the default plan and validate email and dates", async () => {
   await assert.rejects(user.validate(), /Cast to date/);
 });
 
-test("saving a password hashes it, preserves it on other edits, and hashes replacements", async (t) => {
+test("the model preserves hashes supplied by the controller", async (t) => {
   let inserted;
   t.mock.method(User.collection, "insertOne", async (document) => {
     inserted = { ...document };
     return { acknowledged: true, insertedId: document._id };
   });
   t.mock.method(User.collection, "updateOne", async () => ({ acknowledged: true, matchedCount: 1 }));
-  const user = new User({ displayName: "Ada", email: "ada@example.com", password: "first password" });
+  const user = new User({ displayName: "Ada", email: "ada@example.com", passwordHash: await bcrypt.hash("first password", 4) });
   await user.save();
-  assert.notEqual(inserted.password, "first password");
-  assert.equal(await bcrypt.compare("first password", inserted.password), true);
-  const firstHash = user.password;
+  assert.notEqual(inserted.passwordHash, "first password");
+  assert.equal(await bcrypt.compare("first password", inserted.passwordHash), true);
+  const firstHash = user.passwordHash;
   user.displayName = "Ada Lovelace";
   await user.save();
-  assert.equal(user.password, firstHash);
-  user.password = "second password";
+  assert.equal(user.passwordHash, firstHash);
+  user.passwordHash = await bcrypt.hash("second password", 4);
   await user.save();
-  assert.equal(await bcrypt.compare("second password", user.password), true);
+  assert.equal(await bcrypt.compare("second password", user.passwordHash), true);
 });
 
 test("goals accept text values and reject out-of-range progress", async () => {
-  const goal = new Goal({ user: new mongoose.Types.ObjectId(), title: "Study", targetValue: 10, Value: "hours" });
+  const goal = new Goal({ user: new mongoose.Types.ObjectId(), title: "Study", targetValue: 10, unit: "hours" });
   await goal.validate();
   assert.equal(goal.currentValue, 0);
   goal.currentValue = -1;

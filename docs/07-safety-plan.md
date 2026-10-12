@@ -1,25 +1,13 @@
-# Keeping accounts safe
+# Account and data protection
 
-We will learn simple safety habits from the first day.
+Passwords are hashed by the controller with bcrypt. Inputs require at least eight characters and at most 72 UTF-8 bytes. Hashes and email-token hashes are excluded from public responses.
 
-## Passwords
+Email links expire and are consumed with a conditional database update. Earlier links survive failed resend attempts. Registration reports a delivery failure separately from account creation; users can retry through the resend route.
 
-We will never save a real password in MongoDB. We will save a password hash instead. When a user logs in, the backend will compare the password to the saved hash.
+Sessions are stored in MongoDB and checked on every protected request. JWT access and refresh secrets are distinct. Refresh tokens rotate, reuse revokes the session, logout revokes the current browser session, and a password reset changes the account session version to invalidate all sessions.
 
-## Private values
+All learning queries include the authenticated user ID. Requests cannot set or change ownership. Another user's record produces 404.
 
-Database addresses, Mailtrap keys, and token secrets will go in a local `.env` file. That file will not be uploaded to GitHub.
+Repeated authentication attempts are rate-limited. Browser cookies are HttpOnly and SameSite=Lax, with Secure enabled in production. CORS permits the configured frontend origin. Production errors hide internal server details.
 
-## Email links
-
-Verification and password-reset links will use random tokens. They will expire after a short time. A reset link will expire after 15 minutes. A verification link will expire after 24 hours.
-
-## User ownership
-
-When we add logs and goals, the backend will use the signed-in user’s identity. It will not trust a user ID sent by the frontend. This will stop one user from editing another user’s data.
-
-## Slow down repeated attempts
-
-Later, we will limit repeated login and reset-password requests. This is called rate limiting.
-
-Security is a habit. We will keep asking: “What information should this user be allowed to see or change?”
+Keep database credentials, signing secrets, and Mailtrap credentials in an untracked environment file. Use HTTPS and same-site frontend/API hosting. See the README for multi-instance rate-limit and deployment considerations.

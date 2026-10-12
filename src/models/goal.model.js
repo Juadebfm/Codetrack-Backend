@@ -16,6 +16,7 @@ const goalSchema = new mongoose.Schema(
     },
     currentValue: {
       type: Number,
+      default: 0,
       required: true,
       min: 0,
     },
