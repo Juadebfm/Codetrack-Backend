@@ -8,6 +8,10 @@ export const environment = {
   accessSecret: process.env.JWT_ACCESS_SECRET,
   refreshSecret: process.env.JWT_REFRESH_SECRET,
   mailtrapToken: process.env.MAILTRAP_TOKEN,
+  mailtrapHost: process.env.MAILTRAP_HOST,
+  mailtrapPort: process.env.MAILTRAP_PORT,
+  mailtrapUser: process.env.MAILTRAP_USER,
+  mailtrapPassword: process.env.MAILTRAP_PASSWORD,
   mailFromEmail: process.env.MAIL_FROM_EMAIL,
   mailFromName: process.env.MAIL_FROM_NAME,
 };

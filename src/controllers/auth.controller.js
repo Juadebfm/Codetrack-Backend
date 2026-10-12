@@ -99,8 +99,21 @@ export async function register(request, response, next) {
       passwordHash,
     });
 
-    // Send verification now that user email is saved
-    await sendVerificationEmail(user);
+    try {
+      // Send verification now that user email is saved
+      await sendVerificationEmail(user);
+    } catch (emailError) {
+      try {
+        //Reg must not leave an account behind when verification delivery fails
+        await User.deleteOne({ _id: user._id });
+      } catch (rollbackError) {
+        console.error("Could not remove the new account after email failure", {
+          userId: user.id,
+          rollbackError,
+        });
+      }
+      return next(emailError);
+    }
 
     return response.status(201).json({
       message: "Account created successfully, Check your email to verify it",
@@ -224,20 +237,16 @@ export async function refresh(request, response, next) {
     tokenData = verifyRefreshToken(refreshToken);
   } catch {
     clearSessionCookies(response);
-    return response
-      .status(401)
-      .json({
-        error: { message: "Your session has ended. Please log in again" },
-      });
+    return response.status(401).json({
+      error: { message: "Your session has ended. Please log in again" },
+    });
   }
 
   if (tokenData.type !== "refresh" || !tokenData.sub) {
     clearSessionCookies(response);
-    return response
-      .status(401)
-      .json({
-        error: { message: "Your session has ended. Please log in again" },
-      });
+    return response.status(401).json({
+      error: { message: "Your session has ended. Please log in again" },
+    });
   }
 
   try {
@@ -245,11 +254,9 @@ export async function refresh(request, response, next) {
 
     if (!user || user.sessionVersion !== tokenData.sessionVersion) {
       clearSessionCookies(response);
-      return response
-        .status(401)
-        .json({
-          error: { message: "Your session has ended. Please log in again" },
-        });
+      return response.status(401).json({
+        error: { message: "Your session has ended. Please log in again" },
+      });
     }
 
     setSessionCookies(response, createSessionTokens(user));
