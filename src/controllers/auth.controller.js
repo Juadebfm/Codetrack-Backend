@@ -57,6 +57,9 @@ async function sendVerificationEmail(user) {
   );
 }
 
+// Please add the token verification contrast functionality.
+
+
 // Register function / Signup function
 export async function register(request, response, next) {
   // Coming from the FE
