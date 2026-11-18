@@ -27,8 +27,12 @@ function escapeHtml(value) {
   });
 }
 
-function createEmailContent(subject, linkText, link) {
+function createEmailContent(subject, linkText, link, verificationCode) {
   const isPasswordReset = subject.toLowerCase().includes("reset");
+  const hasVerificationCode =
+    !isPasswordReset &&
+    typeof verificationCode === "string" &&
+    /^\d{6}$/.test(verificationCode);
   const title = isPasswordReset ? "Reset your password" : "Verify your email";
   const introduction = isPasswordReset
     ? "We received a request to reset the password for your CodeTrack account. Use the button below to choose a new password."
@@ -41,6 +45,9 @@ function createEmailContent(subject, linkText, link) {
   const safeTitle = escapeHtml(title);
   const safeIntroduction = escapeHtml(introduction);
   const safeExpiry = escapeHtml(expiry);
+  const safeVerificationCode = hasVerificationCode
+    ? escapeHtml(verificationCode)
+    : "";
 
   const text = [
     `CodeTrack: ${title}`,
@@ -49,6 +56,9 @@ function createEmailContent(subject, linkText, link) {
     "",
     `${linkText}:`,
     link,
+    ...(hasVerificationCode
+      ? ["", "Or enter this six-digit verification code:", verificationCode]
+      : []),
     "",
     expiry,
     "If you did not request this, you can ignore this email.",
@@ -94,6 +104,7 @@ function createEmailContent(subject, linkText, link) {
                     </td>
                   </tr>
                 </table>
+                ${hasVerificationCode ? `<p style="margin:0 0 8px;color:#526078;font-size:15px;line-height:1.6;">Or enter this six-digit verification code:</p><p style="margin:0 0 24px;color:#0f766e;font-size:28px;font-weight:bold;letter-spacing:6px;">${safeVerificationCode}</p>` : ""}
                 <p style="margin:0 0 8px;color:#667085;font-size:13px;line-height:1.6;">${safeExpiry}</p>
                 <p style="margin:0;color:#667085;font-size:13px;line-height:1.6;">If the button doesn’t work, copy and paste this link into your browser:</p>
                 <p style="margin:8px 0 0;word-break:break-all;font-size:13px;line-height:1.6;"><a href="${safeLink}" style="color:#0f766e;">${safeLink}</a></p>
@@ -115,10 +126,15 @@ function createEmailContent(subject, linkText, link) {
   return { text, html };
 }
 
-export async function sendEmail(to, subject, linkText, link) {
+export async function sendEmail(to, subject, linkText, link, verificationCode) {
   if (environment.nodeEnv === "test") return;
 
-  const { text, html } = createEmailContent(subject, linkText, link);
+  const { text, html } = createEmailContent(
+    subject,
+    linkText,
+    link,
+    verificationCode,
+  );
 
   await transport.sendMail({
     from: {

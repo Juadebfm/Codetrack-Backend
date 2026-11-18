@@ -1,6 +1,11 @@
-Client(request(name, email , password)) ----> <-(middleware ())BE->(response (name, email, password, API-KEY))-->{MONGODB}
+# Email Verification Code Changes
 
+Document to track changes we are going to be making to this codebase from the commit hash number `ba80b5`
 
-request - middleware - response
+## Files to be changed
 
-FE(val) --> middleware[(error-handler), (authenticate)] --> (BE(validate) -> schema(val) -> database)
+- auth.controller : create and check six digit code, then we rotate credentials on (any of the platform MailTrap / Resend), we return verification expiry timeframe
+- user.model.js : stores the code as a hidden hash
+- auth.routes.js: add rate limiter and code verification
+- send email: to include code sending
+- 2 tests auth.test and send-email.test

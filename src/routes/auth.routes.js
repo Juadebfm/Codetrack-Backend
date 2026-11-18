@@ -10,6 +10,12 @@ const router = Router();
 
 router.post("/register", authRateLimit, authController.register);
 router.get("/verify-email", authRateLimit, authController.verifyEmail);
+// The six-digit code is an alternative to the existing verification link.
+router.post(
+  "/verify-email/code",
+  authRateLimit,
+  authController.verifyEmailCode,
+);
 router.post(
   "/resend-verification",
   authRateLimit,

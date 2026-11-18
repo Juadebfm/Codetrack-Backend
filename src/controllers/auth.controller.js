@@ -1,4 +1,5 @@
 import bcrypt from "bcryptjs";
+import { randomInt } from "node:crypto";
 import { User } from "../models/user.model.js";
 import { environment } from "../config/environment.js";
 import { hashOpaqueToken, createOpaqueToken } from "../utils/token.js";
@@ -13,6 +14,22 @@ import {
 
 const opaqueTokenLength = 64;
 const passwordResetTokenLifetimeMs = 15 * 60 * 1000;
+
+// Email verification cred expire together after 24 hours
+const EMAIL_VERIFICATION_LIFETIME_MS = 24 * 60 * 60 * 1000;
+const EMAIL_VERIFICATION_LIFETIME_SECONDS =
+  EMAIL_VERIFICATION_LIFETIME_MS / 1000;
+
+async function createEmailVerificationCode(previousCodeHash) {
+  let code;
+  do {
+    code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  } while (
+    previousCodeHash &&
+    (await bcrypt.compare(code, previousCodeHash))
+  );
+  return code;
+}
 
 // Controller specific util functions
 function hasValidEmail(email) {
@@ -44,8 +61,10 @@ function publicUser(user) {
 // Sending verification email
 async function sendVerificationEmail(user) {
   const token = createOpaqueToken();
+  const code = await createEmailVerificationCode(user.emailVerificationCodeHash);
   user.emailVerificationTokenHash = hashOpaqueToken(token);
-  user.emailVerificationExpiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  user.emailVerificationCodeHash = await bcrypt.hash(code, 12);
+  user.emailVerificationExpiresAt = new Date(Date.now() + EMAIL_VERIFICATION_LIFETIME_MS);
   await user.save();
 
   const link = `${environment.frontendUrl}/verify-email?token=${token}`;
@@ -54,11 +73,9 @@ async function sendVerificationEmail(user) {
     "Verify your CodeTrack Email",
     "Verify your CodeTrack email",
     link,
+    code
   );
 }
-
-// Please add the token verification contrast functionality.
-
 
 // Register function / Signup function
 export async function register(request, response, next) {
@@ -120,6 +137,7 @@ export async function register(request, response, next) {
 
     return response.status(201).json({
       message: "Account created successfully, Check your email to verify it",
+      verificationExpiresInSeconds: EMAIL_VERIFICATION_LIFETIME_SECONDS,
       user: publicUser(user),
     });
   } catch (error) {
@@ -130,6 +148,7 @@ export async function register(request, response, next) {
 // Verify email
 export async function verifyEmail(request, response, next) {
   const { token } = request.query;
+
   // validate the token we got from the email is accurate
   if (typeof token !== "string" || token.length !== 64)
     return response.status(400).json({
@@ -141,7 +160,7 @@ export async function verifyEmail(request, response, next) {
     const user = await User.findOne({
       emailVerificationTokenHash: tokenHash,
       emailVerificationExpiresAt: { $gt: new Date() },
-    });
+    }).select("+emailVerificationTokenHash +emailVerificationCodeHash");
 
     if (!user)
       return response.status(400).json({
@@ -152,6 +171,7 @@ export async function verifyEmail(request, response, next) {
 
     user.emailVerifiedAt = new Date();
     user.emailVerificationTokenHash = undefined;
+    user.emailVerificationCodeHash = undefined;
     user.emailVerificationExpiresAt = undefined;
 
     await user.save();
@@ -162,6 +182,48 @@ export async function verifyEmail(request, response, next) {
   }
 }
 
+// Six-digit verification as an alternative to the existing email link.
+export async function verifyEmailCode(request, response, next) {
+  const { email, code } = request.body;
+
+  if (!hasValidEmail(email) || typeof code !== "string" || !/^\d{6}$/.test(code)) {
+    return response.status(400).json({
+      error: {
+        message: "Please provide a valid email address and six-digit verification code",
+      },
+    });
+  }
+
+  try {
+    const user = await User.findOne({
+      email: normalizeEmail(email),
+      emailVerifiedAt: null,
+      emailVerificationExpiresAt: { $gt: new Date() },
+    }).select("+emailVerificationCodeHash +emailVerificationTokenHash");
+
+    const codeMatches = user?.emailVerificationCodeHash
+      ? await bcrypt.compare(code, user.emailVerificationCodeHash)
+      : false;
+
+    if (!codeMatches) {
+      return response.status(400).json({
+        error: { message: "The verification code is invalid or has expired" },
+      });
+    }
+
+    user.emailVerifiedAt = new Date();
+    user.emailVerificationTokenHash = undefined;
+    user.emailVerificationCodeHash = undefined;
+    user.emailVerificationExpiresAt = undefined;
+    await user.save();
+
+    return response.json({ message: "Email verified, proceed to login" });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+
 // resend verification email
 export async function resendVerification(request, response, next) {
   const { email } = request.body;
@@ -171,13 +233,14 @@ export async function resendVerification(request, response, next) {
       .json({ error: { message: "Provide a valid email address" } });
 
   try {
-    const user = await User.findOne({ email: normalizeEmail(email) });
+    const user = await User.findOne({ email: normalizeEmail(email) }).select("+emailVerificationCodeHash");
 
     if (user && !user.emailVerifiedAt) await sendVerificationEmail(user);
 
     return response.json({
       message:
         "If an unverified account exists, a verification email has been sent",
+        verificationExpiresInSeconds: EMAIL_VERIFICATION_LIFETIME_SECONDS
     });
   } catch (error) {
     return next(error);

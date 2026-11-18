@@ -29,6 +29,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       select: false,
     },
+    // Store only the hashed six-digit code, never the readable code itself.
+    emailVerificationCodeHash: {
+      type: String,
+      select: false,
+    },
     emailVerificationExpiresAt: {
       type: Date,
       select: false,
