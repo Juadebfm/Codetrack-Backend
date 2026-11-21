@@ -104,6 +104,7 @@ export async function register(request, response, next) {
     if (existingUser)
       return response.status(409).json({
         error: {
+          code: "ACCOUNT_ALREADY_EXISTS",
           message:
             "An account with that email already exists, Please go to login if you are the account owner",
         },
@@ -273,7 +274,10 @@ export async function login(request, response, next) {
     // user is not verified
     if (!user.emailVerifiedAt)
       return response.status(401).json({
-        error: { message: "Verify your email before you can log in" },
+        error: {
+          code: "EMAIL_NOT_VERIFIED",
+          message: "Verify your email before you can log in",
+        },
       });
 
     setSessionCookies(response, createSessionTokens(user));

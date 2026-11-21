@@ -46,6 +46,31 @@ async function registerTestUser() {
   });
 }
 
+describe("registration and login recovery", () => {
+  it("identifies an existing account when registration is retried", async () => {
+    await registerTestUser();
+
+    const duplicate = await registerTestUser();
+
+    expect(duplicate.status).toBe(409);
+    expect(duplicate.body.error.code).toBe("ACCOUNT_ALREADY_EXISTS");
+  });
+
+  it("identifies an unverified account when valid credentials attempt login", async () => {
+    await registerTestUser();
+
+    const login = await request(app)
+      .post("/api/v1/auth/login")
+      .send({ email: "alex@example.com", password: "safe-password-123" });
+
+    expect(login.status).toBe(401);
+    expect(login.body.error).toEqual({
+      code: "EMAIL_NOT_VERIFIED",
+      message: "Verify your email before you can log in",
+    });
+  });
+});
+
 describe("email verification code", () => {
   it("emails both verification choices and reports the expiry", async () => {
     const registration = await registerTestUser();
